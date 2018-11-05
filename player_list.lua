@@ -1,8 +1,13 @@
 local Event = require 'utils.event'
 local Global = require 'utils.global'
 local Gui = require 'utils.gui'
+local Donators = require 'resources.donators'
 local UserGroups = require 'user_groups'
 local PlayerStats = require 'player_stats'
+local Utils = require 'utils.utils'
+local Report = require 'report'
+local Game = require 'utils.game'
+local name = require "utils.math"
 
 local poke_messages = require 'resources.poke_messages'
 local player_sprites = require 'resources.player_sprites'
@@ -16,13 +21,16 @@ local focus_color = {r = 1, g = 0.55, b = 0.1}
 local rank_colors = {
     {r = 1, g = 1, b = 1}, -- Guest
     {r = 0.155, g = 0.540, b = 0.898}, -- Regular
+    {r = 172.6, g = 70.2, b = 215.8}, -- Donator {r = 152, g = 24, b = 206}
     {r = 0.093, g = 0.768, b = 0.172} -- Admin
 }
 
 local inv_sprite_time_step = 1 / sprite_time_step
+local rank_perk_flag = Donators.donator_perk_flags.rank
 local rank_names = {
     'Guest',
     'Regular',
+    'Donator',
     'Admin'
 }
 
@@ -58,6 +66,7 @@ local distance_heading_name = Gui.uid_name()
 local coin_heading_name = Gui.uid_name()
 local deaths_heading_name = Gui.uid_name()
 local poke_name_heading_name = Gui.uid_name()
+local report_heading_name = Gui.uid_name()
 
 local sprite_cell_name = Gui.uid_name()
 local player_name_cell_name = Gui.uid_name()
@@ -67,6 +76,7 @@ local distance_cell_name = Gui.uid_name()
 local coin_cell_name = Gui.uid_name()
 local deaths_cell_name = Gui.uid_name()
 local poke_cell_name = Gui.uid_name()
+local report_cell_name = Gui.uid_name()
 
 local function lighten_color(color)
     color.r = color.r * 0.6 + 0.4
@@ -75,48 +85,23 @@ local function lighten_color(color)
     color.a = 1
 end
 
-local minutes_to_ticks = 60 * 60
-local hours_to_ticks = 60 * 60 * 60
-local ticks_to_minutes = 1 / minutes_to_ticks
-local ticks_to_hours = 1 / hours_to_ticks
-
-local function format_time(ticks)
-    local result = {}
-
-    local hours = math.floor(ticks * ticks_to_hours)
-    if hours > 0 then
-        ticks = ticks - hours * hours_to_ticks
-        table.insert(result, hours)
-        if hours == 1 then
-            table.insert(result, 'hour')
-        else
-            table.insert(result, 'hours')
-        end
-    end
-
-    local minutes = math.floor(ticks * ticks_to_minutes)
-    table.insert(result, minutes)
-    if minutes == 1 then
-        table.insert(result, 'minute')
-    else
-        table.insert(result, 'minutes')
-    end
-
-    return table.concat(result, ' ')
-end
-
 local function format_distance(tiles)
     return math.round(tiles * 0.001, 1) .. ' km'
 end
 
 local function get_rank_level(player)
     if player.admin then
-        return 3
-    elseif UserGroups.is_regular(player.name) then
-        return 2
-    else
-        return 1
+        return 4
     end
+
+    local name = player.name
+    if UserGroups.player_has_donator_perk(name, rank_perk_flag) then
+        return 3
+    elseif UserGroups.is_regular(name) then
+        return 2
+    end
+
+    return 1
 end
 
 local function do_poke_spam_protection(player)
@@ -224,7 +209,7 @@ local column_builders = {
             return label
         end,
         draw_cell = function(parent, cell_data)
-            local text = format_time(cell_data)
+            local text = Utils.format_time(cell_data)
 
             local label = parent.add {type = 'label', name = time_cell_name, caption = text}
             local label_style = label.style
@@ -404,21 +389,75 @@ local column_builders = {
 
             return label
         end
+    },
+    [report_heading_name] = {
+        create_data = function(player)
+            return player
+        end,
+        sort = function(a, b)
+            return a.name:lower() < b.name:lower()
+        end,
+        draw_heading = function(parent, data)
+            local label =
+                parent.add {
+                type = 'label',
+                name = report_heading_name,
+                caption = 'Report',
+                tooltip = 'Report player to the admin team for griefing or breaking the rules.'
+            }
+            local label_style = label.style
+            apply_heading_style(label_style)
+            label_style.width = 58
+
+            return label
+        end,
+        draw_cell = function(parent, cell_data, data)
+            local parent_style = parent.style
+            parent_style.width = 58
+            parent_style.align = 'center'
+
+            local label =
+                parent.add {
+                type = 'sprite-button',
+                name = report_cell_name,
+                sprite = 'utility/force_editor_icon',
+                tooltip = 'Report ' .. cell_data.name
+            }
+            local label_style = label.style
+            label_style.align = 'center'
+            label_style.minimal_width = 32
+            label_style.height = 24
+            label_style.font = 'default-bold'
+            label_style.top_padding = 0
+            label_style.bottom_padding = 0
+            label_style.left_padding = 0
+            label_style.right_padding = 0
+
+            Gui.set_data(label, cell_data)
+
+            return label
+        end
     }
 }
 
 local function get_default_player_settings()
-    return {
-        columns = {
+    columns = {
             sprite_heading_name,
             player_name_heading_name,
             time_heading_name,
             rank_heading_name,
-            distance_heading_name,
-            coin_heading_name,
-            deaths_heading_name,
-            poke_name_heading_name
-        },
+            distance_heading_name
+    }
+    local offset = 6
+    if global.scenario.config.player_list.enable_coin_col then
+        columns[6] = coin_heading_name
+        offset = 7
+    end
+    columns[offset] =  deaths_heading_name
+    columns[offset + 1] = poke_name_heading_name
+    columns[offset + 2] = report_heading_name
+    return {
+        columns = columns,
         sort = -3
     }
 end
@@ -574,7 +613,7 @@ local function tick()
 end
 
 local function player_joined(event)
-    local player = game.players[event.player_index]
+    local player = Game.get_player_by_index(event.player_index)
     if not player or not player.valid then
         return
     end
@@ -706,5 +745,15 @@ Gui.on_click(
                 p.print(message)
             end
         end
+    end
+)
+
+Gui.on_click(
+    report_cell_name,
+    function(event)
+        local reporting_player = event.player
+        local reported_player = Gui.get_data(event.element)
+
+        Report.spawn_reporting_popup(reporting_player, reported_player)
     end
 )

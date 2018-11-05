@@ -6,6 +6,7 @@ in this file and your run_*type*_module(event) function will be called.
 --]]
 
 local b = require 'map_gen.shared.builders'
+local Perlin = require 'map_gen.shared.perlin_noise'
 
 local shape = nil
 local regen_decoratives = false
@@ -18,6 +19,9 @@ local tiles_per_tick = 32
 --require "map_gen.combined.dimensions"
 --require "map_gen.combined.dagobah_swamp"
 --require "map_gen.combined.meteor_strike" --unfinished
+--require 'map_gen.combined.cave_miner.cave_miner'
+--require "map_gen.combined.diggy"
+
 
 --presets--
 --shape = require "map_gen.presets.template"
@@ -62,8 +66,10 @@ local tiles_per_tick = 32
 --shape = require "map_gen.presets.plus"
 --shape = require "map_gen.presets.honeycomb"
 --shape = require "map_gen.presets.line_and_trees"
+--shape = require "map_gen.presets.line_and_tree"
 --shape = require "map_gen.presets.square_spiral"
 --shape = require "map_gen.presets.beach"
+--shape = require "map_gen.presets.double_beach"
 --shape = require "map_gen.presets.factory"
 --shape = require "map_gen.presets.triangle_of_death"
 --shape = require "map_gen.presets.world_map"
@@ -73,6 +79,10 @@ local tiles_per_tick = 32
 --shape = require "map_gen.presets.dino_island"
 --shape  = require "map_gen.presets.toxic_jungle"
 --shape  = require "map_gen.presets.danger_ores"
+--shape  = require "map_gen.presets.bacon_islands"
+--shape = require "map_gen.presets.spiral"
+--shape = require "map_gen.presets.hub_spiral"
+--shape = require "map_gen.presets.vanilla"
 --shape = require "map_gen.presets.test"
 
 --shapes--
@@ -95,17 +105,14 @@ local tiles_per_tick = 32
 --require "map_gen.terrain.neko_bridged_rivers"
 --require "map_gen.terrain.neko_river_overlay"
 
---ores--
---require "map_gen.ores.rso.rso_control"
-
 -- modules that only return max one entity per tile
 local entity_modules = {
 	--require "map_gen.misc.loot_items",
 	--require "map_gen.terrain.mines",
 	--require "map_gen.terrain.deathworld",
-	--require "map_gen.ores.glitter_ores",	
+	--require "map_gen.ores.glitter_ores",
 	--require "map_gen.terrain.worms",
-	--require "map_gen.misc.wreck_items",	
+	--require "map_gen.misc.wreck_items",
 	--require "map_gen.ores.neko_crazy_ores",
 	--require "map_gen.ores.fluffy_rainbows",
 	--require "map_gen.ores.harmonic_gen",
@@ -123,6 +130,10 @@ miscs = {}
 --table.insert(miscs, require("map_gen.misc.rail_grid")) -- used for map_gen.presets.UK
 --require ('map_gen.misc.change_landfill_tile')('sand-1')
 --require ('map_gen.misc.danger_ore_banned_entities')
+--require ('map_gen.misc.restrict_landfill_tile')({['water'] = true})
+--require "map_gen.ores.rso.rso_control"
+--require 'map_gen.misc.nightfall'
+--require 'map_gen.misc.car_body'
 
 if #entity_modules > 0 then
     shape = shape or b.full_shape

@@ -2,6 +2,8 @@ local Gui = require 'utils.gui'
 local Global = require 'utils.global'
 local Event = require 'utils.event'
 local UserGroups = require 'user_groups'
+local Game = require 'utils.game'
+local math = require "utils.math"
 
 local default_poll_duration = 300 * 60 -- in ticks
 local duration_max = 3600 -- in seconds
@@ -129,7 +131,7 @@ local function redraw_poll_viewer_content(data)
     end
 
     for player_index, answer in pairs(voters) do
-        local p = game.players[player_index]
+        local p = Game.get_player_by_index(player_index)
         table.insert(tooltips[answer], p.name)
     end
 
@@ -156,7 +158,7 @@ local function redraw_poll_viewer_content(data)
     if next(edited_by_players) then
         local edit_names = {'Edited by '}
         for pi, _ in pairs(edited_by_players) do
-            local p = game.players[pi]
+            local p = Game.get_player_by_index(pi)
             if p and p.valid then
                 table.insert(edit_names, p.name)
                 table.insert(edit_names, ', ')
@@ -666,7 +668,7 @@ local function update_vote(voters, answer, direction)
     local tooltip = {}
     for pi, a in pairs(voters) do
         if a == answer then
-            local player = game.players[pi]
+            local player = Game.get_player_by_index(pi)
             table.insert(tooltip, player.name)
         end
     end
@@ -738,7 +740,7 @@ local function vote(event)
 end
 
 local function player_joined(event)
-    local player = game.players[event.player_index]
+    local player = Game.get_player_by_index(event.player_index)
     if not player or not player.valid then
         return
     end

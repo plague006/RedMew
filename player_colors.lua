@@ -1,4 +1,5 @@
 local Event = require 'utils.event'
+local Game = require 'utils.game'
 
 local player_colors = {
     ['grilledham'] = {
@@ -8,13 +9,25 @@ local player_colors = {
     ['plague006'] = {
         color = {r = 64, g = 224, b = 208, a = 0.5},
         chat_color = {r = 175, g = 238, b = 238, a = 0.5}
+    },
+    ['Linaori'] = {
+        color = {r = 255, g = 255, b = 0, a = 0.5},
+        chat_color = {r = 255, g = 255, b = 0, a = 0.5}
+    },
+    ['Jayefuu'] = {
+        color = {r = 0.559, g = 0.761, b = 0.157, a = 0.5},
+        chat_color = {r = 0.708, g = 0.996, b = 0.134, a = 0.5}
+    },
+    ['robertkruijt'] = {
+        color = {r = 0.275, g = 0.755, b = 0.712, a = 0.5},
+        chat_color = {r = 0.335, g = 0.918, b = 0.866, a = 0.5}
     }
 }
 
 Event.add(
     defines.events.on_player_created,
     function(event)
-        local player = game.players[event.player_index]
+        local player = Game.get_player_by_index(event.player_index)
         if not player or not player.valid then
             return
         end

@@ -1,5 +1,6 @@
 local Event = require 'utils.event'
 local Gui = require 'utils.gui'
+local Game = require 'utils.game'
 
 local brush_tool = 'refined-hazard-concrete'
 
@@ -40,6 +41,9 @@ local filter_table_close_button_name = Gui.uid_name()
 
 global.paint_brushes_by_player = {}
 local function player_build_tile(event)
+    if not global.scenario.config.paint.enable then 
+        return 
+    end
     if event.item.name ~= brush_tool then
         return
     end
@@ -49,7 +53,7 @@ local function player_build_tile(event)
         return
     end
 
-    local player = game.players[event.player_index]
+    local player = Game.get_player_by_index(event.player_index)
     if not player.gui.left[main_frame_name] then
         return
     end
@@ -71,7 +75,10 @@ local function player_build_tile(event)
 end
 
 local function player_joined(event)
-    local player = game.players[event.player_index]
+    if not global.scenario.config.paint.enable then 
+        return 
+    end
+    local player = Game.get_player_by_index(event.player_index)
     if not player or not player.valid then
         return
     end

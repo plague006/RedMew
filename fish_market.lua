@@ -20,8 +20,10 @@ local Event = require 'utils.event'
 local Token = require 'utils.global_token'
 local Task = require 'utils.Task'
 local PlayerStats = require 'player_stats'
+local Game = require 'utils.game'
 
-local market_items = require 'resources.market_items'
+local Market_items = require 'resources.market_items'
+local market_item = Market_items.market_item
 
 local function spawn_market(cmd)
     local player = game.player
@@ -29,6 +31,7 @@ local function spawn_market(cmd)
         cant_run(cmd.name)
         return
     end
+
     local surface = player.surface
     local force = player.force
 
@@ -38,14 +41,14 @@ local function spawn_market(cmd)
     local market = surface.create_entity {name = 'market', position = pos}
     market.destructible = false
 
-    for _, item in ipairs(market_items) do
+    for _, item in ipairs(Market_items) do
         market.add_market_item(item)
     end
 
     force.add_chart_tag(
         surface,
         {
-            icon = {type = 'item', name = 'coin'},
+            icon = {type = 'item', name = market_item},
             position = pos,
             text = ' Market'
         }
@@ -113,9 +116,9 @@ local total_fish_market_bonus_messages = #fish_market_bonus_message
 
 local function fish_earned(event, amount)
     local player_index = event.player_index
-    local player = game.players[player_index]
+    local player = Game.get_player_by_index(player_index)
 
-    local stack = {name = 'coin', count = amount}
+    local stack = {name = market_item, count = amount}
     local inserted = player.insert(stack)
 
     local diff = amount - inserted
@@ -169,7 +172,7 @@ local entity_drop_amount = {
 local spill_items =
     Token.register(
     function(data)
-        local stack = {name = 'coin', count = data.count}
+        local stack = {name = market_item, count = data.count}
         data.surface.spill_item_stack(data.position, stack, true)
     end
 )
@@ -245,11 +248,15 @@ local function boost_player_runningspeed(player, market)
     global.player_speed_boost_records[player.index].boost_lvl =
         1 + global.player_speed_boost_records[player.index].boost_lvl
     player.character_running_speed_modifier = 1 + player.character_running_speed_modifier
-    game.print(string.format(boost_msg[global.player_speed_boost_records[player.index].boost_lvl], player.name))
+
     if global.player_speed_boost_records[player.index].boost_lvl >= 4 then
+        game.print(string.format(boost_msg[global.player_speed_boost_records[player.index].boost_lvl], player.name))
         reset_player_runningspeed(player)
         player.character.die(player.force, market)
+        return
     end
+
+    player.print(string.format(boost_msg[global.player_speed_boost_records[player.index].boost_lvl], player.name))
 end
 
 local function reset_player_miningspeed(player)
@@ -278,11 +285,15 @@ local function boost_player_miningspeed(player, market)
     global.player_mining_boost_records[player.index].boost_lvl =
         1 + global.player_mining_boost_records[player.index].boost_lvl
     player.character_mining_speed_modifier = 1 + player.character_mining_speed_modifier
-    game.print(string.format(boost_msg[global.player_mining_boost_records[player.index].boost_lvl], player.name))
+
     if global.player_mining_boost_records[player.index].boost_lvl >= 4 then
+        game.print(string.format(boost_msg[global.player_mining_boost_records[player.index].boost_lvl], player.name))
         reset_player_miningspeed(player)
         player.character.die(player.force, market)
+        return
     end
+
+    player.print(string.format(boost_msg[global.player_mining_boost_records[player.index].boost_lvl], player.name))
 end
 
 local function market_item_purchased(event)
@@ -301,12 +312,12 @@ local function market_item_purchased(event)
     PlayerStats.change_coin_spent(player_index, fish_cost)
 
     if event.offer_index == 1 then -- Temporary speed bonus
-        local player = game.players[player_index]
+        local player = Game.get_player_by_index(player_index)
         boost_player_runningspeed(player, market)
     end
 
     if event.offer_index == 2 then -- Temporary mining bonus
-        local player = game.players[player_index]
+        local player = Game.get_player_by_index(player_index)
         boost_player_miningspeed(player, market)
     end
 
@@ -366,14 +377,14 @@ local function on_180_ticks()
         if global.player_speed_boost_records then
             for k, v in pairs(global.player_speed_boost_records) do
                 if game.tick - v.start_tick > 3000 then
-                    reset_player_runningspeed(game.players[k])
+                    reset_player_runningspeed(Game.get_player_by_index(k))
                 end
             end
         end
         if global.player_mining_boost_records then
             for k, v in pairs(global.player_mining_boost_records) do
                 if game.tick - v.start_tick > 6000 then
-                    reset_player_miningspeed(game.players[k])
+                    reset_player_miningspeed(Game.get_player_by_index(k))
                 end
             end
         end
@@ -438,10 +449,17 @@ local function fish_player_crafted_item(event)
     end
 end
 
-commands.add_command('market', 'Places a fish market near you.  (Admins only)', spawn_market)
+local function init()
 
-Event.on_nth_tick(180, on_180_ticks)
-Event.add(defines.events.on_pre_player_mined_item, pre_player_mined_item)
-Event.add(defines.events.on_entity_died, fish_drop_entity_died)
-Event.add(defines.events.on_market_item_purchased, market_item_purchased)
-Event.add(defines.events.on_player_crafted_item, fish_player_crafted_item)
+  if global.scenario.config.fish_market.enable then
+    commands.add_command('market', 'Places a fish market near you.  (Admins only)', spawn_market)
+
+    Event.on_nth_tick(180, on_180_ticks)
+    Event.add(defines.events.on_pre_player_mined_item, pre_player_mined_item)
+    Event.add(defines.events.on_entity_died, fish_drop_entity_died)
+    Event.add(defines.events.on_market_item_purchased, market_item_purchased)
+    Event.add(defines.events.on_player_crafted_item, fish_player_crafted_item)
+  end
+end
+Event.on_init(init)
+Event.on_load(init)

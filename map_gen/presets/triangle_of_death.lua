@@ -6,10 +6,10 @@ local Global = require 'utils.global'
 local Event = require 'utils.event'
 
 -- change these to change the pattern.
-local ore_seed1 = 10000
-local ore_seed2 = 20000
+local ore_seed1 = 30000
+local ore_seed2 = 2 * ore_seed1
 local enemy_seed = 420420
-local loot_seed = 7
+local loot_seed = 1000
 
 local generator
 
@@ -273,13 +273,13 @@ local loot_power = 500
 local function loot(x, y)
     local seed = bit32.band(x * 374761393 + y * 668265263 + loot_seed, 4294967295)
     generator.re_seed(seed)
-    if generator(4096) ~= 1 then
+    if generator(8192) ~= 1 then
         return nil
     end
 
-    local d = math.sqrt(x * x + y * y)
+    local d_sq = x * x + y * y
     local name
-    if d < 600 then
+    if d_sq < 360000 then --d < 600
         name = 'car'
     else
         if math.random(5) == 1 then

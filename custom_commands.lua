@@ -3,6 +3,7 @@ local Event = require 'utils.event'
 local Token = require 'utils.global_token'
 local UserGroups = require 'user_groups'
 local Utils = require 'utils.utils'
+local Game = require 'utils.game'
 --local Antigrief = require 'antigrief'
 
 function player_print(str)
@@ -297,7 +298,7 @@ local function built_entity(event)
             return
         end
 
-        game.players[index].teleport(entity.position)
+        Game.get_player_by_index(index).teleport(entity.position)
         entity.destroy()
     end
 end
@@ -484,7 +485,7 @@ local function find_player(cmd)
         return
     end
 
-    player.add_custom_alert(target, {type = 'virtual', name = 'signal-F'}, player.name, true)
+    player.add_custom_alert(target, {type = 'virtual', name = 'signal-F'}, name, true)
 end
 
 local function jail_player(cmd)
@@ -532,8 +533,20 @@ local function jail_player(cmd)
     permission_group.set_allows_action(defines.input_action.write_to_console, true)
     permission_group.set_allows_action(defines.input_action.edit_permission_group, true)
 
+    -- Kick player out of vehicle
+	target_player.driving=false
     -- Add player to jail group
-    permission_group.add_player(target_player)
+	permission_group.add_player(target_player)
+	-- Check if a player is shooting while jailed, if they are, remove the weapon in their active gun slot.
+	if target_player.shooting_state.state ~= 0 then
+		-- Use a while loop because if a player has guns in inventory they will auto-refill the slot.
+		while target_player.get_inventory(defines.inventory.player_guns)[target_player.character.selected_gun_index].valid_for_read do
+			target_player.remove_item(target_player.get_inventory(defines.inventory.player_guns)[target_player.character.selected_gun_index])
+		end
+		target_player.print(
+            'Your active weapon has been removed because you were shooting while jailed. Your gun will *not* be returned to you in the event of being unjailed.'
+        )
+	end
 
     -- Check that it worked
     if target_player.permission_group == permission_group then
@@ -588,6 +601,8 @@ local function unjail_player(cmd)
 
     -- Move player
     permission_group.add_player(target)
+	-- Set player to a non-shooting state (solves a niche case where players jailed while shooting will be locked into a shooting state)
+	target_player.shooting_state.state = 0
 
     -- Check that it worked
     if target_player.permission_group == permission_group then
@@ -600,6 +615,13 @@ local function unjail_player(cmd)
             'Something went wrong in the unjailing of ' ..
                 target .. '. You can still change their group via /permissions and inform them.'
         )
+    end
+end
+
+local function all_tech()
+    if game.player then
+        game.player.force.research_all_technologies()
+        player_print('Your force has been granted all technologies')
     end
 end
 
@@ -620,6 +642,33 @@ if not _DEBUG then
             end
         )
     end
+end
+
+local function admin_chat(cmd)
+    if not game.player or game.player.admin then --admins AND server
+        for _, p in pairs(game.players) do
+            if p.admin then
+                local tag = ''
+                if game.player.tag and game.player.tag ~= '' then
+                    tag = ' ' .. game.player.tag
+                end
+                p.print(string.format('(Admin) %s%s: %s', game.player.name, tag, cmd.parameter), game.player.chat_color)
+            end
+        end
+    end
+end
+
+local function show_rail_block()
+    local player = game.player
+    if not player then
+        return
+    end
+
+    local vs = player.game_view_settings
+    local show = not vs.show_rail_block_visualisation
+    vs.show_rail_block_visualisation = show
+
+    player.print('show_rail_block_visualisation set to ' .. tostring(show))
 end
 
 commands.add_command('kill', 'Will kill you.', kill)
@@ -644,18 +693,12 @@ commands.add_command(
 
 commands.add_command('tempban', '<player> <minutes> Temporarily bans a player (Admins only)', tempban)
 commands.add_command('zoom', '<number> Sets your zoom.', zoom)
-commands.add_command(
-    'all-tech',
-    'researches all technologies',
-    function()
-        if game.player and game.player.admin then
-            game.player.force.research_all_technologies()
-        end
-    end
-)
+if _DEBUG then
+    commands.add_command('all-tech', 'researches all technologies (debug only)', all_tech)
+end
 commands.add_command(
     'hax',
-    'Toggles your hax',
+    'Toggles your hax (makes recipes cost nothing)',
     function()
         if game.player and game.player.admin then
             game.player.cheat_mode = not game.player.cheat_mode
@@ -680,3 +723,42 @@ commands.add_command(
     '<player> restores ability for a player to perform actions. (Admins only)',
     unjail_player
 )
+commands.add_command('a', 'Admin chat. Messages all other admins (Admins only)', admin_chat)
+
+local Report = require('report')
+
+local function report(cmd)
+    local reporting_player = game.player
+    if reporting_player then
+        local params = {}
+        for param in string.gmatch(cmd.parameter, '%S+') do
+            table.insert(params, param)
+        end
+        if #params < 2 then
+            reporting_player.print('Please enter then name of the offender and the reason for the report.')
+            return nil
+        end
+        local reported_player_name = params[1] or ''
+        local reported_player = game.players[reported_player_name]
+
+        if not reported_player then
+            reporting_player.print(reported_player_name .. ' does not exist.')
+            return nil
+        end
+        Report.report(reporting_player, reported_player, string.sub(cmd.parameter, string.len(params[1]) + 2))
+    end
+end
+
+commands.add_command('report', '<griefer-name> <message> Reports a user to admins', report)
+
+commands.add_command(
+    'showreports',
+    'Shows user reports (Admins only)',
+    function(event)
+        if game.player and game.player.admin then
+            Report.show_reports(Game.get_player_by_index(event.player_index))
+        end
+    end
+)
+
+commands.add_command('show-rail-block', 'Toggles rail block visualisation', show_rail_block)

@@ -1,25 +1,10 @@
 local Module = {}
+local Game = require 'utils.game'
 
 Module.distance = function(pos1, pos2)
     local dx = pos2.x - pos1.x
     local dy = pos2.y - pos1.y
     return math.sqrt(dx * dx + dy * dy)
-end
-
--- rounds number (num) to certain number of decimal places (idp)
-math.round = function(num, idp)
-    local mult = 10 ^ (idp or 0)
-    return math.floor(num * mult + 0.5) / mult
-end
-
-function math.clamp(num, min, max)
-    if num < min then
-        return min
-    elseif num > max then
-        return max
-    else
-        return num
-    end
 end
 
 Module.print_except = function(msg, player)
@@ -79,7 +64,7 @@ Module.find_entities_by_last_user =
         surface = game.surfaces[surface]
     end
     if type(player) == 'number' then
-        player = game.players[player]
+        player = Game.get_player_by_index(player)
     end
     filters.force = player.force.name
     for _, e in pairs(surface.find_entities_filtered(filters)) do
@@ -97,4 +82,35 @@ Module.ternary = function(c, t, f)
         return f
     end
 end
+
+
+local minutes_to_ticks = 60 * 60
+local hours_to_ticks = 60 * 60 * 60
+local ticks_to_minutes = 1 / minutes_to_ticks
+local ticks_to_hours = 1 / hours_to_ticks
+Module.format_time = function(ticks)
+    local result = {}
+
+    local hours = math.floor(ticks * ticks_to_hours)
+    if hours > 0 then
+        ticks = ticks - hours * hours_to_ticks
+        table.insert(result, hours)
+        if hours == 1 then
+            table.insert(result, 'hour')
+        else
+            table.insert(result, 'hours')
+        end
+    end
+
+    local minutes = math.floor(ticks * ticks_to_minutes)
+    table.insert(result, minutes)
+    if minutes == 1 then
+        table.insert(result, 'minute')
+    else
+        table.insert(result, 'minutes')
+    end
+
+    return table.concat(result, ' ')
+end
+
 return Module

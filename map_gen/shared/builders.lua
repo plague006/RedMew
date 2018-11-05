@@ -1,9 +1,14 @@
+local math = require "utils.math"
+
 -- helpers
 tau = 2 * math.pi
 deg_to_rad = tau / 360
+local inv_pi = 1 / math.pi
 function degrees(angle)
     return angle * deg_to_rad
 end
+
+local Builders = {}
 
 local function add_entity(tile, entity)
     if type(tile) == 'table' then
@@ -22,7 +27,9 @@ local function add_entity(tile, entity)
     return tile
 end
 
-local Builders = {}
+function Builders.add_entity(tile, entity)
+    return add_entity(tile, entity)
+end
 
 -- shape builders
 function Builders.empty_shape()
@@ -125,6 +132,20 @@ function Builders.sine_fill(width, height)
     end
 end
 
+function Builders.sine_wave(width, height, thickness)
+    local width_inv = tau / width
+    local height_inv = 2 / height
+    thickness = thickness * 0.5
+    return function(x, y)
+        local x2 = x * width_inv
+        local y2 = math.sin(x2)
+        y = y * height_inv
+        local d = math.abs(y2 - y)
+
+        return d < thickness
+    end
+end
+
 function Builders.rectangular_spiral(x_size, optional_y_size)
     optional_y_size = optional_y_size or x_size
 
@@ -140,6 +161,66 @@ function Builders.rectangular_spiral(x_size, optional_y_size)
         else
             return y == a and x ~= a
         end
+    end
+end
+
+function Builders.circular_spiral(in_thickness, total_thickness)
+    local half_total_thickness = total_thickness * 0.5
+    return function(x, y)
+        local d = math.sqrt(x * x + y * y)
+
+        local angle = 1 + inv_pi * math.atan2(x, y)
+        local offset = d + (angle * half_total_thickness)
+
+        return offset % total_thickness < in_thickness
+    end
+end
+
+function Builders.circular_spiral_grow(in_thickness, total_thickness, grow_factor)
+    local half_total_thickness = total_thickness * 0.5
+    local inv_grow_factor = 1 / grow_factor
+    return function(x, y)
+        local d = math.sqrt(x * x + y * y)
+
+        local factor = (d * inv_grow_factor) + 1
+        local total_thickness2 = total_thickness * factor
+        local in_thickness2 = in_thickness * factor
+        local half_total_thickness2 = half_total_thickness * factor
+
+        local angle = 1 + inv_pi * math.atan2(x, y)
+        local offset = d + (angle * half_total_thickness2)
+
+        return offset % total_thickness2 < in_thickness2
+    end
+end
+
+function Builders.circular_spiral_n_threads(in_thickness, total_thickness, n_threads)
+    local half_total_thickness = total_thickness * 0.5 * n_threads
+    return function(x, y)
+        local d = math.sqrt(x * x + y * y)
+
+        local angle = 1 + inv_pi * math.atan2(x, y)
+        local offset = d + (angle * half_total_thickness)
+
+        return offset % total_thickness < in_thickness
+    end
+end
+
+function Builders.circular_spiral_grow_n_threads(in_thickness, total_thickness, grow_factor, n_threads)
+    local half_total_thickness = total_thickness * 0.5 * n_threads
+    local inv_grow_factor = 1 / grow_factor
+    return function(x, y)
+        local d = math.sqrt(x * x + y * y)
+
+        local factor = (d * inv_grow_factor) + 1
+        local total_thickness2 = total_thickness * factor
+        local in_thickness2 = in_thickness * factor
+        local half_total_thickness2 = half_total_thickness * factor
+
+        local angle = 1 + inv_pi * math.atan2(x, y)
+        local offset = d + (angle * half_total_thickness2)
+
+        return offset % total_thickness2 < in_thickness2
     end
 end
 
@@ -582,7 +663,7 @@ function Builders.entity_func(shape, func)
     end
 end
 
-function Builders.resource(shape, resource_type, amount_function)
+function Builders.resource(shape, resource_type, amount_function, always_place)
     amount_function = amount_function or function()
             return 404
         end
@@ -590,7 +671,8 @@ function Builders.resource(shape, resource_type, amount_function)
         if shape(x, y, world) then
             return {
                 name = resource_type,
-                amount = amount_function(world.x, world.y)
+                amount = amount_function(world.x, world.y),
+                always_place = always_place
             }
         end
     end
@@ -949,6 +1031,65 @@ function Builders.single_spiral_rotate_pattern(shape, width, optional_height)
     end
 end
 
+function Builders.circular_spiral_pattern(in_thickness, total_thickness, pattern)
+    local n_threads = #pattern
+    total_thickness = total_thickness * n_threads
+    local half_total_thickness = total_thickness * 0.5
+    local delta = total_thickness / n_threads
+    return function(x, y, world)
+        local d = math.sqrt(x * x + y * y)
+
+        local angle = 1 + inv_pi * math.atan2(x, y)
+
+        local offset = d + (angle * half_total_thickness)
+        if offset % total_thickness < in_thickness then
+            return pattern[1](x, y, world)
+        end
+
+        for i = 2, n_threads do
+            offset = offset + delta
+            if offset % total_thickness < in_thickness then
+                return pattern[i](x, y, world)
+            end
+        end
+
+        return false
+    end
+end
+
+function Builders.circular_spiral_grow_pattern(in_thickness, total_thickness, grow_factor, pattern)
+    local n_threads = #pattern
+    total_thickness = total_thickness * n_threads
+    local half_total_thickness = total_thickness * 0.5
+    local inv_grow_factor = 1 / grow_factor
+    local delta = total_thickness / n_threads
+    return function(x, y, world)
+        local d = math.sqrt(x * x + y * y)
+
+        local factor = (d * inv_grow_factor) + 1
+        local total_thickness2 = total_thickness * factor
+        local in_thickness2 = in_thickness * factor
+        local half_total_thickness2 = half_total_thickness * factor
+        local delta2 = delta * factor
+
+        local angle = 1 + inv_pi * math.atan2(x, y)
+
+        local offset = d + (angle * half_total_thickness2)
+        if offset % total_thickness2 < in_thickness2 then
+            return pattern[1](x, y, world)
+        end
+
+        for i = 2, n_threads do
+            offset = offset + delta2
+            if offset % total_thickness2 < in_thickness2 then
+                return pattern[i](x, y, world)
+            end
+        end
+
+        return false
+    end
+end
+
 function Builders.segment_pattern(pattern)
     local count = #pattern
 
@@ -1291,6 +1432,13 @@ end
 function Builders.euclidean_value(base, mult)
     return function(x, y)
         return mult * math.sqrt(x * x + y * y) + base
+    end
+end
+
+function Builders.exponential_value(base, mult, pow)
+    return function(x, y)
+        local d_sq = x * x + y * y
+        return base + mult * d_sq ^ (pow / 2)
     end
 end
 

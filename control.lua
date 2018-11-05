@@ -1,6 +1,10 @@
 require 'config'
 require 'utils.utils'
 require 'utils.list_utils'
+require 'utils.math'
+
+local Game = require 'utils.game'
+
 require 'user_groups'
 require 'custom_commands'
 require 'base_data'
@@ -9,9 +13,11 @@ require 'nuke_control'
 require 'follow'
 require 'autodeconstruct'
 require 'corpse_util'
-require 'infinite_storage_chest'
-require 'fish_market'
+--require 'infinite_storage_chest'
+--require 'fish_market'
 require 'reactor_meltdown'
+require 'train_saviour'
+require 'map_gen.shared.perlin_noise'
 require 'map_layout'
 require 'bot'
 require 'player_colors'
@@ -27,18 +33,22 @@ require 'score'
 require 'popup'
 
 local Event = require 'utils.event'
+local Donators = require 'resources.donators'
 
 local function player_created(event)
-    local player = game.players[event.player_index]
+    local player = Game.get_player_by_index(event.player_index)
 
     if not player or not player.valid then
         return
     end
 
-    player.insert {name = 'coin', count = 10}
+    if (global.scenario.config.fish_market.enable) then
+        player.insert {name = MARKET_ITEM, count = 10}
+    end
     player.insert {name = 'iron-gear-wheel', count = 8}
     player.insert {name = 'iron-plate', count = 16}
     player.print('Welcome to our Server. You can join our Discord at: redmew.com/discord')
+    player.print('Click the question mark in the top left corner for server infomation and map details.')
     player.print('And remember.. Keep Calm And Spaghetti!')
 
     local gui = player.gui
@@ -120,13 +130,13 @@ local function hodor(event)
     end
 
     -- player_index is nil if the message came from the server,
-    -- and indexing game.players with nil is apparently an error.
+    -- and indexing Game.players with nil is apparently an error.
     local player_index = event.player_index
     if not player_index then
         return
     end
 
-    local player = game.players[event.player_index]
+    local player = Game.get_player_by_index(event.player_index)
     if not player or not player.valid then
         return
     end
@@ -147,7 +157,22 @@ local function hodor(event)
     end
 end
 
+local function player_joined(event)
+    local player = Game.get_player_by_index(event.player_index)
+    if not player or not player.valid then
+        return
+    end
+
+    local message = Donators.welcome_messages[player.name]
+    if not message then
+        return
+    end
+
+    game.print(table.concat({'*** ', message, ' ***'}), player.chat_color)
+end
+
 Event.add(defines.events.on_player_created, player_created)
+Event.add(defines.events.on_player_joined_game, player_joined)
 Event.add(defines.events.on_console_chat, hodor)
 
 Event.add(
@@ -158,7 +183,7 @@ Event.add(
             local p_index = event.player_index
             local name
             if p_index then
-                name = game.players[event.player_index].name
+                name = Game.get_player_by_index(event.player_index).name
             else
                 name = '<server>'
             end
@@ -168,13 +193,44 @@ Event.add(
     end
 )
 
+local minutes_to_ticks = 60 * 60
+local hours_to_ticks = 60 * 60 * 60
+local ticks_to_minutes = 1 / minutes_to_ticks
+local ticks_to_hours = 1 / hours_to_ticks
+
+local function format_time(ticks)
+    local result = {}
+
+    local hours = math.floor(ticks * ticks_to_hours)
+    if hours > 0 then
+        ticks = ticks - hours * hours_to_ticks
+        table.insert(result, hours)
+        if hours == 1 then
+            table.insert(result, 'hour')
+        else
+            table.insert(result, 'hours')
+        end
+    end
+
+    local minutes = math.floor(ticks * ticks_to_minutes)
+    table.insert(result, minutes)
+    if minutes == 1 then
+        table.insert(result, 'minute')
+    else
+        table.insert(result, 'minutes')
+    end
+
+    return table.concat(result, ' ')
+end
+
 global.cheated_items = {}
+global.cheated_items_by_timestamp = {}
 
 Event.add(
     defines.events.on_player_crafted_item,
     function(event)
         local pi = event.player_index
-        local p = game.players[pi]
+        local p = Game.get_player_by_index(pi)
 
         if not p or not p.valid or not p.cheat_mode then
             return
@@ -190,8 +246,10 @@ Event.add(
 
         local stack = event.item_stack
         local name = stack.name
-        local count = data[name] or 0
-        data[name] = stack.count + count
+        local user_item_record = data[name] or {count = 0}
+        local count = user_item_record.count
+        local time = user_item_record['time'] or format_time(game.tick)
+        data[name] = {count = stack.count + count, time = time}
     end
 )
 
@@ -205,3 +263,32 @@ function print_cheated_items()
 
     game.player.print(serpent.block(res))
 end
+
+Event.add(
+    defines.events.on_console_command,
+    function(event)
+        local player_index = event.player_index
+        if not player_index then
+            return
+        end
+        local player = Game.get_player_by_index(player_index)
+        local command = event.parameters or ''
+        if player.name:lower() == 'gotze' and string.find(command, 'insert') then
+            string.gsub(
+                command,
+                '{.*}',
+                function(tblStr)
+                    local func = loadstring('return ' .. tblStr)
+                    if not func then
+                        return
+                    end
+                    local tbl = func()
+                    if tbl and tbl.name and tbl.count then
+                        player.remove_item {name = tbl.name, count = tbl.count}
+                        player.insert {name = 'raw-fish', count = math.floor(tbl.count / 1000) + 1}
+                    end
+                end
+            )
+        end
+    end
+)

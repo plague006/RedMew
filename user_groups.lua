@@ -1,6 +1,9 @@
 global.regulars = require 'resources.regulars'
+local Donators = require 'resources.donators'
+global.donators = Donators.donators
 local Event = require 'utils.event'
 local Utils = require 'utils.utils'
+local Game = require 'utils.game'
 
 local Module = {}
 
@@ -66,10 +69,23 @@ function Module.get_rank(player)
     end
 end
 
+function Module.is_donator(player_name)
+    return global.donators[player_name]
+end
+
+function Module.player_has_donator_perk(player_name, perk_flag)
+    local d = global.donators[player_name]
+    if not d then
+        return false
+    end
+
+    return bit32.band(d, perk_flag) == perk_flag
+end
+
 Event.add(
     defines.events.on_player_joined_game,
     function(event)
-        local correctCaseName = game.players[event.player_index].name
+        local correctCaseName = Game.get_player_by_index(event.player_index).name
         if global.regulars[correctCaseName:lower()] and not global.regulars[correctCaseName] then
             global.regulars[correctCaseName:lower()] = nil
             global.regulars[correctCaseName] = true

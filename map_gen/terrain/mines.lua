@@ -1,9 +1,9 @@
 local Event = require 'utils.event'
+local Game = require 'utils.game'
 
 local mines_factor = 1
 
---Do not change this:
-mines_factor = 16384 / mines_factor
+mines_factor_sq = 16384 * 16384 / mines_factor / mines_factor
 
 local death_messages = {
     "went exploring, and didn't bring a minesweeping kit.",
@@ -35,7 +35,7 @@ local death_messages = {
 }
 
 local function player_died(event)
-    local player = game.players[event.player_index]
+    local player = Game.get_player_by_index(event.player_index)
     if not player or not player.valid then
         return
     end
@@ -46,13 +46,13 @@ end
 Event.add(defines.events.on_player_died, player_died)
 
 return function(x, y)
-    local distance = math.sqrt(x * x + y * y)
+    local distance_sq = x * x + y * y
 
-    if distance <= 210 then
+    if distance_sq <= 44100 then
         return nil
     end
 
-    local chance = math.floor(mines_factor / distance) + 1
+    local chance = math.floor(mines_factor_sq / distance_sq) + 1
 
     if math.random(chance) == 1 then
         return {name = 'land-mine', force = 'enemy'}
