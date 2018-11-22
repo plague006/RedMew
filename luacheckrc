@@ -41,7 +41,7 @@ files['.luacheckrc'] = {
 -------------------------------------------------------------------------------
 --[Set Defaults]--
 -------------------------------------------------------------------------------
-local LINE_LENGTH = false -- It is 2017 limits on length are a waste
+local LINE_LENGTH = 170 -- It is 2017 limits on length are a waste
 local IGNORE = {'21./%w+_$', '21./^_%w+$', '213/[ijk]', '213/index', '213/key'}
 local NOT_GLOBALS = {'coroutine', 'io', 'socket', 'dofile', 'loadfile'} -- These globals are not available to the factorio API
 
@@ -56,7 +56,7 @@ local STD_BASE_CONTROL = 'lua52c+factorio+factorio_control+factorio_defines+fact
 --[Assume Factorio Control stage as default]--
 -------------------------------------------------------------------------------
 std = STD_CONTROL
-globals = {'math', 'table', '_DEBUG', 'MARKET_ITEM', 'newline'}
+globals = {'math', 'table', '_DEBUG', 'MARKET_ITEM', 'newline'} -- RedMew-specific globals
 max_line_length = LINE_LENGTH
 
 not_globals = NOT_GLOBALS
@@ -194,6 +194,13 @@ stds.factorio = {
 
 stds.factorio_control = {
     read_globals = {
+
+        -- @commands@:
+        commands = {
+            fields = {
+                "add_command", "commands", "game_commands",
+            },
+        },
 
         -- @settings@:
         settings = {
@@ -357,14 +364,7 @@ stds.factorio_control = {
         "global",
 
         -- @MOD@: Keep it organized, use this variable for anything that "NEEDS" to be global for some reason.
-        "MOD",
-
-        -- @commands@:
-        commands = {
-            fields = {
-                "add_command", "commands", "game_commands",
-            },
-        }
+        "MOD"
     },
 }
 
