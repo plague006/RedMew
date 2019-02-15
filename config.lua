@@ -89,7 +89,6 @@ global.config = {
     market = {
         enabled = true,
         currency = currency,
-
         -- defines the chance that killing an entity will drop coins and the min and max it can drop upon death
         entity_drop_amount = {
             ['biter-spawner'] = {low = 5, high = 15, chance = 1},
@@ -97,7 +96,6 @@ global.config = {
             ['small-worm-turret'] = {low = 2, high = 8, chance = 1},
             ['medium-worm-turret'] = {low = 5, high = 15, chance = 1},
             ['big-worm-turret'] = {low = 10, high = 20, chance = 1},
-
             -- default is 0, no chance of coins dropping from biters/spitters
             ['small-biter'] = {low = 1, high = 5, chance = 0},
             ['small-spitter'] = {low = 1, high = 2, chance = 0},
@@ -270,7 +268,7 @@ global.config = {
         enabled = true
     },
     -- sets the day/night cycle or a fixed light level. use_day_night_cycle and use_fixed_brightness are mutually exclusive
-    day_night ={
+    day_night = {
         -- enables/disables the module
         enabled = false,
         -- for info on day/night cycles see https://github.com/Refactorio/RedMew/wiki/Day-Night-cycle
@@ -285,6 +283,24 @@ global.config = {
         -- brightness is a number between 0.15 and 1
         use_fixed_brightness = false,
         fixed_brightness = 0.5
+    },
+    -- allows for large-scale biter attacks
+    biter_attacks = {
+        enabled = true,
+        -- whether or not to send attacks on timed intervals (against a random player)
+        timed_attacks = {
+            enabled = true,
+            -- frequency of automatic attacks (in seconds)
+            attack_frequency = 40 * 60, -- 40 minutes
+            -- difficulty of automatic attacks (easy, normal, hard, brutal)
+            attack_difficulty = 'normal'
+        },
+        -- whether or not to send attacks on rocket launches
+        launch_attacks = {
+            enabled = true,
+            -- whether to only attack on the first launch
+            first_launch_only = false
+        }
     }
 }
 

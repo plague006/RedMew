@@ -79,6 +79,9 @@ end
 if config.day_night.enabled then
     require 'map_gen.shared.day_night'
 end
+if config.biter_attacks then
+    require 'map_gen.shared.biter_attacks'
+end
 
 -- GUIs
 -- The order determines the order they appear from left to right.

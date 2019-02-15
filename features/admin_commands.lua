@@ -4,6 +4,7 @@ local Global = require 'utils.global'
 local Rank = require 'features.rank_system'
 local Report = require 'features.report'
 local Apocalypse = require 'features.apocalypse'
+local BiterAttack = require 'map_gen.shared.biter_attacks'
 local Utils = require 'utils.core'
 local Game = require 'utils.game'
 local Event = require 'utils.event'
@@ -25,6 +26,10 @@ Global.register(
         tp_players = tbl.tp_players
     end
 )
+
+local function fail_no_target()
+    Game.player_print({'common.fail_no_target'}, Color.fail)
+end
 
 --- Sends a message to all online admins
 local function admin_chat(args, player)
@@ -79,7 +84,7 @@ local function regular(args)
     local name = args['name']
 
     if not game.players[name] then
-        Game.player_print('The player you targeted has never joined this game, please ensure no typo in name.', Color.red)
+        fail_no_target()
         return
     end
 
@@ -116,7 +121,7 @@ local function probation(args)
     local target_player = game.players[name]
 
     if not target_player then
-        Game.player_print('The player you targeted has never joined this game, please ensure no typo in name.', Color.red)
+        fail_no_target()
         return
     end
 
@@ -192,7 +197,7 @@ local function tempban(args, player)
     local target = game.players[target_name]
     local duration = args.minutes
     if not target then
-        Game.player_print("Player doesn't exist.")
+        fail_no_target()
         return
     end
     if not tonumber(duration) then
@@ -231,7 +236,7 @@ end
 local function invoke(args, player)
     local target = game.players[args.player]
     if not target then
-        Game.player_print('Unknown player.')
+        fail_no_target()
         return
     end
     local pos = player.surface.find_non_colliding_position('player', player.position, 50, 1)
@@ -251,7 +256,7 @@ local function teleport_player(args, player)
         target = game.players[target_name]
     end
     if not target then
-        Game.player_print('Unknown player.')
+        fail_no_target()
         return
     end
     local surface = target.surface
@@ -340,6 +345,34 @@ local function destroy_selected(_, player)
     else
         Game.player_print('Nothing found to destroy. (You must have an entity under your cursor when you hit enter)')
     end
+end
+
+--- Launches a biter attack
+local function biter_attack(args)
+    local target_name = args.player
+    local target = game.players[target_name]
+    if not target or not target.valid then
+        fail_no_target()
+        return
+    end
+
+    local target_pos = target.position
+    local surface = target.surface
+    local spawn_loc = target.force.get_spawn_position(surface)
+    local character = target.character
+    if not character or not character.valid then
+        character = nil
+    end
+
+    local data = {
+        surface = surface,
+        scan_center = target_pos,
+        attack_pos = spawn_loc,
+        biters_to_send = args.quantity,
+        target_ent = character
+    }
+    BiterAttack.launch_attack(data)
+    Game.player_print({'admin_commands.biter_attack_success', target_name}, Color.success)
 end
 
 -- Event registrations
@@ -498,6 +531,17 @@ Command.add(
     revive_ghosts
 )
 
+Command.add(
+    'biter-attack',
+    {
+        description = 'Orders the provided number of biters to attack the provided player ',
+        arguments = {'player', 'quantity'},
+        required_rank = Ranks.admin,
+        allowed_by_server = true
+    },
+    biter_attack
+)
+
 -- Commands with no functions, only calls to other modules
 
 Command.add(
@@ -506,7 +550,7 @@ Command.add(
         description = "Calls for the endtimes. This really ends the map, so you must use '/apocalypse end this map'",
         arguments = {'confirmation'},
         capture_excess_arguments = true,
-        required_rank = Ranks.admin,
+        required_rank = Ranks.admin
     },
     Apocalypse.begin_apocalypse
 )
