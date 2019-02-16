@@ -106,11 +106,12 @@ Debug.print(data)
     local y = center.y or center[2]
     local dx = 0
     local dy = -1
+    local half_rows = num_scan_rows / 2
     Debug.print({
         total_scans = total_scans
     })
     for i = 1, total_scans do
-        if (-num_scan_rows / 2 <= x and x <= num_scan_rows / 2) and (-num_scan_rows / 2 < y and y <= num_scan_rows / 2) then
+        if (-half_rows <= x and x <= half_rows) and (-half_rows < y and y <= half_rows) then
             scan_centers[i] = {x * scan_diameter, y * scan_diameter}
         end
         if x == y or (x < 0 and x == -y) or (x > 0 and x == 1 - y) then
