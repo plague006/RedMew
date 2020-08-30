@@ -4,6 +4,13 @@ dist: xenial
 branches:
   only:
     - develop
+#before_install:
+#  - pip install hererocks
+#  - hererocks ~/build/lua_install -r^ --$LUA
+#  - export PATH=$PATH:~/build/lua_install/bin
+install: skip
+script:
+  - echo "I'm not sure if this can be skipped. *shrug*"
 before_deploy:
   - ./.travis/check_locale.sh
   - git config --local user.name "$github_user_name"
@@ -12,10 +19,10 @@ before_deploy:
   - export DATE_FORMATTED
   - COMMIT_SHA=$(git log --format=%h -1)
   - export COMMIT_SHA
-  - TRAVIS_TAG="monthly/"$DATE_FORMATTED-$COMMIT_SHA
+  - TRAVIS_TAG="release/"$DATE_FORMATTED-$COMMIT_SHA
   - export TRAVIS_TAG
   - git tag "$TRAVIS_TAG"
-  - RELEASE_NAME='Monthly release - '"$DATE_FORMATTED"' - '"$COMMIT_SHA"
+  - RELEASE_NAME='Release - '"$DATE_FORMATTED"' - '"$COMMIT_SHA"
   - export RELEASE_NAME
   - ./.travis/release_builder.sh
 deploy:
