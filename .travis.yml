@@ -9,8 +9,7 @@ branches:
 #  - hererocks ~/build/lua_install -r^ --$LUA
 #  - export PATH=$PATH:~/build/lua_install/bin
 install: skip
-script:
-  - echo "I'm not sure if this can be skipped. *shrug*"
+script: skip
 before_deploy:
   - ./.travis/check_locale.sh
   - git config --local user.name "$github_user_name"
